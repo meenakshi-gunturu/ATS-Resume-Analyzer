@@ -1,12 +1,9 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-import base64
 import streamlit as st
 import os
-import io
-from PIL import Image
-import pdf2image
+from PyPDF2 import PdfReader
 import google.generativeai as genai
 
 # Configure Gemini API
@@ -18,38 +15,35 @@ def get_gemini_response(input_prompt, pdf_content, job_description):
     model = genai.GenerativeModel("models/gemini-3.6-flash")
 
     response = model.generate_content(
-        [
-            input_prompt,
-            pdf_content[0],
-            job_description
-        ]
+        f"""
+        Resume:
+        {pdf_content}
+
+        Job Description:
+        {job_description}
+
+        Task:
+        {input_prompt}
+        """
     )
 
     return response.text
-# Convert PDF to image
+
+
+# Extract text from PDF
 def input_pdf_setup(uploaded_file):
-    if uploaded_file is not None:
 
-        images = pdf2image.convert_from_bytes(uploaded_file.read())
+    pdf_reader = PdfReader(uploaded_file)
 
-        first_page = images[0]
+    text = ""
 
-        img_byte_arr = io.BytesIO()
-        first_page.save(img_byte_arr, format="JPEG")
+    for page in pdf_reader.pages:
+        page_text = page.extract_text()
 
-        img_byte_arr = img_byte_arr.getvalue()
+        if page_text:
+            text += page_text
 
-        pdf_parts = [
-            {
-                "mime_type": "image/jpeg",
-                "data": base64.b64encode(img_byte_arr).decode()
-            }
-        ]
-
-        return pdf_parts
-
-    else:
-        raise FileNotFoundError("No file uploaded")
+    return text
 
 
 # Streamlit UI
@@ -70,6 +64,7 @@ if uploaded_file is not None:
 submit1 = st.button("Tell Me About The Resume")
 submit3 = st.button("Percentage Match")
 
+
 # Prompt 1
 input_prompt1 = """
 You are an experienced Technical Human Resource Manager.
@@ -77,11 +72,12 @@ You are an experienced Technical Human Resource Manager.
 Review the provided resume against the job description.
 
 Please provide:
-1. Overall evaluation
+1. Overall Evaluation
 2. Strengths
 3. Weaknesses
-4. Suitability for the role
+4. Suitability for the Role
 """
+
 
 # Prompt 2
 input_prompt3 = """
@@ -97,12 +93,14 @@ Provide:
 4. Final Suggestions
 """
 
+
 # Resume Review
 if submit1:
 
     if uploaded_file is not None:
 
         try:
+
             pdf_content = input_pdf_setup(uploaded_file)
 
             response = get_gemini_response(
@@ -127,6 +125,7 @@ if submit3:
     if uploaded_file is not None:
 
         try:
+
             pdf_content = input_pdf_setup(uploaded_file)
 
             response = get_gemini_response(
